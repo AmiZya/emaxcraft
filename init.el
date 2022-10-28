@@ -21,6 +21,10 @@
 (setq use-package-always-ensure 't)
 
 
+(use-package exec-path-from-shell
+  :ensure
+  :init (exec-path-from-shell-initialize))
+
 ;; Keyboard-centric user interface
 (setq inhibit-startup-message t)
 (tool-bar-mode -1)
@@ -384,6 +388,36 @@
   (("M-r" . quickrun)
     ("C-c C-e" . quickrun-shell)))
 
+(use-package rustic
+  :ensure
+  :bind (:map rustic-mode-map
+              ("M-j" . lsp-ui-imenu)
+              ("M-?" . lsp-find-references)
+              ("C-c C-c l" . flycheck-list-errors)
+              ("C-c C-c a" . lsp-execute-code-action)
+              ("C-c C-c r" . lsp-rename)
+              ("C-c C-c q" . lsp-workspace-restart)
+              ("C-c C-c Q" . lsp-workspace-shutdown)
+              ("C-c C-c s" . lsp-rust-analyzer-status))
+  :config
+  ;; uncomment for less flashiness
+  ;; (setq lsp-eldoc-hook nil)
+  ;; (setq lsp-enable-symbol-highlighting nil)
+  ;; (setq lsp-signature-auto-activate nil)
+
+  ;; comment to disable rustfmt on save
+  (setq rustic-format-on-save t)
+  (add-hook 'rustic-mode-hook 'rk/rustic-mode-hook))
+
+(defun rk/rustic-mode-hook ()
+  ;; so that run C-c C-c C-r works without having to confirm, but don't try to
+  ;; save rust buffers that are not file visiting. Once
+  ;; https://github.com/brotzeit/rustic/issues/253 has been resolved this should
+  ;; no longer be necessary.
+  (when buffer-file-name
+    (setq-local buffer-save-without-query t))
+  (add-hook 'before-save-hook 'lsp-format-buffer nil t))
+
 
 (use-package lsp-mode
   :defer t
@@ -397,39 +431,38 @@
   (read-process-output-max (* 1024 1024))
   (lsp-keep-workspace-alive nil)
   (lsp-eldoc-hook nil)
+  ;; what to use when checking on-save. "check" is default, I prefer clippy
+  (lsp-rust-analyzer-cargo-watch-command "clippy")
+  (lsp-eldoc-render-all t)
+  (lsp-idle-delay 0.6)
+  ;; enable / disable the hints as you prefer:
+  (lsp-rust-analyzer-server-display-inlay-hints t)
+  (lsp-rust-analyzer-display-lifetime-elision-hints-enable "skip_trivial")
+  (lsp-rust-analyzer-display-chaining-hints t)
+  (lsp-rust-analyzer-display-lifetime-elision-hints-use-parameter-names nil)
+  (lsp-rust-analyzer-display-closure-return-type-hints t)
+  (lsp-rust-analyzer-display-parameter-hints nil)
+  (lsp-rust-analyzer-display-reborrow-hints nil)
   :bind (:map lsp-mode-map ("C-c C-f" . lsp-format-buffer))
   :hook ((java-mode python-mode go-mode rust-mode
           js-mode js2-mode typescript-mode web-mode
           c-mode c++-mode objc-mode) . lsp-deferred)
   :config
+  (add-hook 'lsp-mode-hook 'lsp-ui-mode)
   (defun lsp-update-server ()
     "Update LSP server."
     (interactive)
     ;; Equals to `C-u M-x lsp-install-server'
     (lsp-install-server t)))
 
-(use-package lsp-mode
-  :defer t
-  :commands lsp
+(use-package lsp-ui
+  :ensure
+  :commands lsp-ui-mode
   :custom
-  (lsp-keymap-prefix "C-x l")
-  (lsp-auto-guess-root nil)
-  (lsp-prefer-flymake nil) ; Use flycheck instead of flymake
-  (lsp-enable-file-watchers nil)
-  (lsp-enable-folding nil)
-  (read-process-output-max (* 1024 1024))
-  (lsp-keep-workspace-alive nil)
-  (lsp-eldoc-hook nil)
-  :bind (:map lsp-mode-map ("C-c C-f" . lsp-format-buffer))
-  :hook ((java-mode python-mode go-mode rust-mode
-          js-mode js2-mode typescript-mode web-mode
-          c-mode c++-mode objc-mode) . lsp-deferred)
-  :config
-  (defun lsp-update-server ()
-    "Update LSP server."
-    (interactive)
-    ;; Equals to `C-u M-x lsp-install-server'
-    (lsp-install-server t)))
+  (lsp-ui-peek-always-show t)
+  (lsp-ui-sideline-show-hover t)
+  (lsp-ui-doc-enable nil))
+
 
 (use-package company
   :diminish company-mode
@@ -807,7 +840,7 @@ If all failed, try to complete the common part with `company-complete-common'"
  ;; If there is more than one, they won't work right.
  '(company-show-quick-access t nil nil "Customized with use-package company")
  '(package-selected-packages
-   '(l undo-fu move-dup diminish flyspell-correct-ivy hackernews quickrun py-snippets flycheck-popup-tip flycheck-posframe flycheck yasnippet-snippets yasnippet which-key vterm use-package undo-tree rainbow-delimiters page-break-lines magit-popup magit ivy-prescient expand-region exec-path-from-shell eterm-256color doom-themes doom-modeline discover-my-major dashboard counsel-projectile benchmark-init all-the-icons ace-window)))
+   '(rustic ialign esup l undo-fu move-dup diminish flyspell-correct-ivy quickrun py-snippets flycheck-popup-tip flycheck-posframe flycheck yasnippet-snippets yasnippet which-key vterm use-package rainbow-delimiters page-break-lines magit-popup magit ivy-prescient expand-region exec-path-from-shell eterm-256color doom-themes doom-modeline discover-my-major dashboard counsel-projectile benchmark-init all-the-icons ace-window)))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
