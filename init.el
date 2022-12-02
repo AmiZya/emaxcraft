@@ -20,11 +20,6 @@
 (require 'use-package)
 (setq use-package-always-ensure 't)
 
-
-(use-package exec-path-from-shell
-  :ensure
-  :init (exec-path-from-shell-initialize))
-
 ;; Keyboard-centric user interface
 (setq inhibit-startup-message t)
 (tool-bar-mode -1)
@@ -68,7 +63,7 @@
 (global-set-key (kbd "C-x C-l") #'toggle-truncate-lines)
 
 (global-set-key (kbd "C-+") #'text-scale-increase)
-(global-set-key (kbd "C--") #'text-scale-decrease)
+(global-set-key (kbd "C-_") #'text-scale-decrease)
 
 (delete-selection-mode)
 ;; (global-set-key (kbd "M-<down>") #'forward-paragraph)
@@ -103,10 +98,6 @@
 ;; (defun my-exec-path-from-shell-initialize ()
 ;;      (when (memq window-system '(mac ns x))
 ;;        (exec-path-from-shell-initialize)))
-
-;; (use-package exec-path-from-shell	
-;;   :init
-;;   (add-hook 'after-init-hook 'my-exec-path-from-shell-initialize))
 
 (use-package doom-themes
   :ensure t
@@ -143,17 +134,13 @@
          :map minibuffer-local-map
          ("M-A" . marginalia-cycle))
 
-  ;; The :init configuration is always executed (Not lazy!)
   :init
-
-  ;; Must be in the :init section of use-package such that the mode gets
-  ;; enabled right away. Note that this forces loading the package.
   (marginalia-mode))
 
 (use-package move-dup
   :bind (("M-<up>"   . move-dup-move-lines-up)
-         ("C-M-<up>" . move-dup-duplicate-up)
          ("M-<down>"   . move-dup-move-lines-down)
+         ("C-M-<up>" . move-dup-duplicate-up)
          ("C-M-<down>" . move-dup-duplicate-down)))
 
 
@@ -170,26 +157,75 @@
 (use-package diminish)
 (diminish eldoc-mode)
 
-(use-package ivy
-      :diminish
-      :config
-      (ivy-mode t))
-(setq ivy-initial-inputs-alist nil)
+(use-package vertico
+      :init
+      (vertico-mode +1))
 
-(use-package counsel
-  :bind (("M-x" . counsel-M-x)
-	 ("C-x C-f" . counsel-find-file)
-	 ("C-x b" . counsel-switch-buffer)
-	 ))
+(use-package vertico-posframe
+  :config
+  (vertico-posframe-mode 1))
 
-(use-package prescient)
-  (use-package ivy-prescient
+(use-package orderless
+    :init
+    (setq completion-styles '(orderless)
+          completion-category-defaults nil
+          completion-category-overrides '((file (styles partial-completion)))))
+
+  ;; Persist history over Emacs restarts. Vertico sorts by history position.
+(use-package savehist
+    :init
+    (savehist-mode))
+
+(use-package consult
+      :bind
+      (("M-y" . 'consult-yank-from-kill-ring)
+       ("M-s" . 'consult-line)
+       ("C-x b" . 'consult-buffer)))
+  (recentf-mode)
+
+    (setq completion-ignore-case t)
+    (setq read-file-name-completion-ignore-case t)
+
+
+(use-package embark
+  :ensure t
+
+  :bind
+  (("C-." . embark-act)         ;; pick some comfortable binding
+   ("C-;" . embark-dwim)        ;; good alternative: M-.
+   ("C-h B" . embark-bindings)) ;; alternative for `describe-bindings'
+
+   :init
+
+   ;; Optionally replace the key help with a completing-read interface
+   (setq prefix-help-command #'embark-prefix-help-command)
+
+   :config
+
+   ;; Hide the mode line of the Embark live/completions buffers
+   (add-to-list 'display-buffer-alist
+                '("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
+                  nil
+                  (window-parameters (mode-line-format . none))))
+
+  )
+
+;; Consult users will also want the embark-consult package.
+(use-package embark-consult
+  :ensure t
+  :after (embark consult)
+  :demand t ; only necessary if you have the hook below
+  ;; if you want to have consult previews as you move around an
+  ;; auto-updating embark collect buffer
+  :hook
+  (embark-collect-mode . consult-preview-at-point-mode))
+
+
+(use-package prescient
     :config
-    (ivy-prescient-mode t))
+    (vertico-prescient-mode t))
 
-(use-package swiper
-    :bind (("M-s" . counsel-grep-or-swiper)))
-
+(use-package vertico-prescient)
 
 (use-package which-key
     :diminish
@@ -206,7 +242,7 @@
   :defer t
   :bind
   (("C-j" . avy-goto-char-timer)
-   ("C-o" . avy-goto-line))
+   ("C-l" . avy-goto-line))
   :custom
   (avy-timeout-seconds 0.3)
   (avy-style 'pre)
@@ -388,37 +424,6 @@
   (("M-r" . quickrun)
     ("C-c C-e" . quickrun-shell)))
 
-(use-package rustic
-  :ensure
-  :bind (:map rustic-mode-map
-              ("M-j" . lsp-ui-imenu)
-              ("M-?" . lsp-find-references)
-              ("C-c C-c l" . flycheck-list-errors)
-              ("C-c C-c a" . lsp-execute-code-action)
-              ("C-c C-c r" . lsp-rename)
-              ("C-c C-c q" . lsp-workspace-restart)
-              ("C-c C-c Q" . lsp-workspace-shutdown)
-              ("C-c C-c s" . lsp-rust-analyzer-status))
-  :config
-  ;; uncomment for less flashiness
-  ;; (setq lsp-eldoc-hook nil)
-  ;; (setq lsp-enable-symbol-highlighting nil)
-  ;; (setq lsp-signature-auto-activate nil)
-
-  ;; comment to disable rustfmt on save
-  (setq rustic-format-on-save t)
-  (add-hook 'rustic-mode-hook 'rk/rustic-mode-hook))
-
-(defun rk/rustic-mode-hook ()
-  ;; so that run C-c C-c C-r works without having to confirm, but don't try to
-  ;; save rust buffers that are not file visiting. Once
-  ;; https://github.com/brotzeit/rustic/issues/253 has been resolved this should
-  ;; no longer be necessary.
-  (when buffer-file-name
-    (setq-local buffer-save-without-query t))
-  (add-hook 'before-save-hook 'lsp-format-buffer nil t))
-
-
 (use-package lsp-mode
   :defer t
   :commands lsp
@@ -431,18 +436,6 @@
   (read-process-output-max (* 1024 1024))
   (lsp-keep-workspace-alive nil)
   (lsp-eldoc-hook nil)
-  ;; what to use when checking on-save. "check" is default, I prefer clippy
-  (lsp-rust-analyzer-cargo-watch-command "clippy")
-  (lsp-eldoc-render-all t)
-  (lsp-idle-delay 0.6)
-  ;; enable / disable the hints as you prefer:
-  (lsp-rust-analyzer-server-display-inlay-hints t)
-  (lsp-rust-analyzer-display-lifetime-elision-hints-enable "skip_trivial")
-  (lsp-rust-analyzer-display-chaining-hints t)
-  (lsp-rust-analyzer-display-lifetime-elision-hints-use-parameter-names nil)
-  (lsp-rust-analyzer-display-closure-return-type-hints t)
-  (lsp-rust-analyzer-display-parameter-hints nil)
-  (lsp-rust-analyzer-display-reborrow-hints nil)
   :bind (:map lsp-mode-map ("C-c C-f" . lsp-format-buffer))
   :hook ((java-mode python-mode go-mode rust-mode
           js-mode js2-mode typescript-mode web-mode
@@ -839,15 +832,16 @@ If all failed, try to complete the common part with `company-complete-common'"
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
  '(company-show-quick-access t nil nil "Customized with use-package company")
+ '(eldoc-documentation-functions nil t nil "Customized with use-package lsp-mode")
  '(package-selected-packages
-   '(rustic ialign esup l undo-fu move-dup diminish flyspell-correct-ivy quickrun py-snippets flycheck-popup-tip flycheck-posframe flycheck yasnippet-snippets yasnippet which-key vterm use-package rainbow-delimiters page-break-lines magit-popup magit ivy-prescient expand-region exec-path-from-shell eterm-256color doom-themes doom-modeline discover-my-major dashboard counsel-projectile benchmark-init all-the-icons ace-window)))
+   '(vertico-posframe rustic ialign esup l undo-fu move-dup diminish flyspell-correct-ivy quickrun py-snippets flycheck-popup-tip flycheck-posframe flycheck yasnippet-snippets yasnippet which-key vterm use-package rainbow-delimiters page-break-lines magit-popup magit ivy-prescient expand-region exec-path-from-shell eterm-256color doom-themes doom-modeline discover-my-major dashboard counsel-projectile benchmark-init all-the-icons ace-window)))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(avy-lead-face ((t (:background "#51afef" :foreground "#870000" :weight bold))))
- '(css-selector ((t (:inherit default :foreground "#66CCFF"))))
+ '(avy-lead-face ((t (:background "#51afef" :foreground "#870000" :weight bold))) t)
+ '(css-selector ((t (:inherit default :foreground "#66CCFF"))) t)
  '(flycheck-posframe-face ((t (:foreground "#53df83"))))
  '(flycheck-posframe-info-face ((t (:foreground "#53df83"))))
  '(font-lock-comment-face ((t (:foreground "#828282")))))
